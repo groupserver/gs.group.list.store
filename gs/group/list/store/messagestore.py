@@ -20,27 +20,43 @@ try:  # Python 2
 except:  # Python 3
     from md5 import md5  # lint:ok
     INT = int
+from logging import getLogger
+log = getLogger('gs.group.list.store.messagestore')
 import re
 from zope.cachedescriptors.property import Lazy
 from zope.datetime import parseDatetimetz
 from gs.core import to_unicode_or_bust, convert_int2b62
 from gs.group.list.base import EmailMessage
+from Products.XWFCore.XWFUtils import removePathsFromFilenames
+from .queries import (EmailMessageStorageQuery, FileMetadataStorageQuery)
 
 
 class EmailMessageStore(EmailMessage):
 
-    def __init__(self, message, list_title='', group_id='', site_id='',
-                 sender_id_cb=None, replace_mail_date=True):
+    def __init__(self, context, message, list_title='', group_id='',
+                 site_id='', sender_id_cb=None, replace_mail_date=True):
         super(EmailMessageStore, self).__init__(
             message, list_title, group_id, site_id, sender_id_cb)
+        self.context = context
         self._list_title = list_title
         self.replace_mail_date = replace_mail_date
 
     @classmethod
-    def from_email_message(cls, emailMessage, replaceMailDate=True):
+    def from_email_message(cls, context, emailMessage,
+                           replaceMailDate=True):
         retval = cls(emailMessage.message, emailMessage.list_title,
                      emailMessage.group_id, emailMessage.site_id,
                      emailMessage.sender_id_cb, replaceMailDate)
+        return retval
+
+    @Lazy
+    def emailQuery(self):
+        retval = EmailMessageStorageQuery(self)
+        return retval
+
+    @Lazy
+    def fileQuery(self):
+        retval = FileMetadataStorageQuery(self)
         return retval
 
     @staticmethod
@@ -155,7 +171,87 @@ Two files will have the same ID if
         assert retval
         return retval
 
+    def manage_addMail(self, msg):
+        """ Store mail & attachments in a folder and return it."""
+        ids = []
+        for attachment in msg.attachments:
+            if ((attachment['filename'] == '')
+                    and (attachment['subtype'] == 'plain')):
+                # We definately don't want to save the plain text body
+                # again!
+                pass
+            elif ((attachment['filename'] == '')
+                    and (attachment['subtype'] == 'html')):
+                # We might want to do something with the HTML body some day,
+                # but we archive the HTML body here, as it suggests in the
+                # log message. The HTML body is archived along with the
+                # plain text body.
+                m = '%s (%s): archiving HTML message.' % \
+                    (self.listTitle, self.group_id)
+                log.info(m)
+            elif attachment['contentid'] and (attachment['filename'] == ''):
+                # TODO: What do we want to do with these? They are typically
+                # part of an HTML message, for example the images, but what
+                # should we do with them once we've stripped them?
+                m = '%s (%s): stripped, but not archiving %s attachment '\
+                    '%s; it appears to be part of an HTML message.' % \
+                    (self.listTitle, self.group_id,
+                     attachment['maintype'], attachment['filename'])
+                log.info(m)
+            elif attachment['length'] <= 0:
+                # Empty attachment. Kinda pointless archiving this!
+                m = '%s (%s): stripped, but not archiving %s attachment '\
+                    '%s; attachment was of zero size.' % \
+                    (self.listTitle, self.group_id,
+                     attachment['maintype'], attachment['filename'])
+                log.warn(m)
+            else:
+                m = '%s (%s): stripped and archiving %s attachment %s' %\
+                    (self.listTitle, self.group_id,
+                     attachment['maintype'], attachment['filename'])
+                log.info(m)
 
-def store_from_message(message):
+                nid = self.addGSFile(attachment['filename'], msg.subject,
+                                     msg.sender_id, attachment['payload'],
+                                     attachment['mimetype'])
+                ids.append(nid)
+
+        self.emailQuery.insert()
+        self.fileQuery.insert(self, ids)
+
+        return (msg.post_id, ids)
+
+    def addGSFile(self, title, topic, creator, data, content_type):
+        """ Adds an attachment as a file.
+
+        """
+        # TODO: group ID should be more robust
+        group_id = self.getId()
+        storage = self.FileLibrary2.get_fileStorage()
+        fileId = storage.add_file(data)
+        fileObj = storage.get_file(fileId)
+        fixedTitle = removePathsFromFilenames(title)
+        fileObj.manage_changeProperties(
+            content_type=content_type, title=fixedTitle,
+            tags=['attachment'], group_ids=[group_id],
+            dc_creator=creator, topic=topic)
+        fileObj.reindex_file()
+        #
+        # Commit the ZODB transaction -- this basically makes it impossible
+        # for us to rollback, but since our RDB transactions won't be rolled
+        # back anyway, we do this so we don't have dangling metadata.
+        #
+        # --=mpj17=-- But it caused death on my local box. So I am
+        # experimenting with commenting it out.
+        # transaction.commit()
+        return fileId
+
+
+def group_store_factory(group, message):
     'For the ZCML, which really does not like class methods.'
-    return EmailMessageStore.from_email_message(message)
+    return EmailMessageStore.from_email_message(group, message)
+
+
+def groupInfo_store_factory(groupInfo, message):
+    'For the ZCML, which really does not like class methods.'
+    return EmailMessageStore.from_email_message(groupInfo.groupObj, message)

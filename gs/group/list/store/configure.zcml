@@ -3,11 +3,17 @@
            xmlns:browser="http://namespaces.zope.org/browser">
 
   <class class=".messagestore.EmailMessageStore">
-    <implements interface=".interfaces.IRDBStorageForEmailMessage" />
+    <implements interface=".interfaces.IStorageForEmailMessage" />
   </class>
 
   <adapter
-    for="gs.group.list.base.interfaces.IEmailMessage"
-    provides=".interfaces.IRDBStorageForEmailMessage"
-    factory=".messagestore.store_from_message" />
+    for="gs.group.base.interfaces.IGSGroupMarker
+         gs.group.list.base.interfaces.IEmailMessage"
+    provides=".interfaces.IStorageForEmailMessage"
+    factory=".messagestore.group_store_factory" />
+  <adapter
+    for="Products.GSGroup.interfaces.IGSGroupInfo
+         gs.group.list.base.interfaces.IEmailMessage"
+    provides=".interfaces.IStorageForEmailMessage"
+    factory=".messagestore.groupInfo_store_factory" />
 </configure>
