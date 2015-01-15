@@ -1,0 +1,6 @@
+recursive-include gs *
+recursive-include docs *
+include version.py
+include *.txt 
+include *.rst
+global-exclude *.pyc
