@@ -30,15 +30,13 @@ class DuplicateMessageError(Exception):
     pass
 
 
-class RDBFileMetadataStorageQuery(object):
-    def __init__(self, context, email_message, file_ids):
+class FileMetadataStorageQuery(object):
+    def __init__(self, context):
         self.context = context
-        self.email_message = email_message
-        self.file_ids = file_ids
         self.fileTable = getTable('file')
         self.postTable = getTable('post')
 
-    def insert(self):
+    def insert(self, email_message, file_ids):
         # FIXME: references like this should *NOT* be hardcoded!
         storage = self.context.FileLibrary2.get_fileStorage()
         session = getSession()
@@ -65,7 +63,7 @@ class RDBFileMetadataStorageQuery(object):
             mark_changed(session)
 
 
-class RDBEmailMessageStorage(object):
+class EmailMessageStorageQuery(object):
 
     def __init__(self, email_message):
         self.email_message = email_message

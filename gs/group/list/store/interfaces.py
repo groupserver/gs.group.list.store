@@ -16,5 +16,5 @@ from __future__ import absolute_import, unicode_literals
 from zope.interface import Interface
 
 
-class IRDBStorageForEmailMessage(Interface):
+class IStorageForEmailMessage(Interface):
     pass
