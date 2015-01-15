@@ -17,8 +17,8 @@ try:
     from hashlib import md5
 except:
     from md5 import md5  # lint:ok
-import logging
-log = logging.getLogger('Products.XWFMailingListManager.emailmessage')
+from logging import getLogger
+log = getLogger('gs.group.list.store.queries')
 import time
 import sqlalchemy as sa
 from sqlalchemy.exc import SQLAlchemyError
