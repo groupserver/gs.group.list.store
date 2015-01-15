@@ -222,12 +222,16 @@ Two files will have the same ID if
 
         return (self.post_id, fileIds)
 
+    @Lazy
+    def storage(self):
+        # Warning: Aquisition
+        retval = self.context.FileLibrary2.get_fileStorage()
+        return retval
+
     def add_file(self, attachment, topic, creator):
         """ Adds an attachment as a file."""
-        # Warning: Aquisition
-        storage = self.context.FileLibrary2.get_fileStorage()
-        fileId = storage.add_file(attachment['payload'])
-        fileObj = storage.get_file(fileId)
+        fileId = self.storage.add_file(attachment['payload'])
+        fileObj = self.storage.get_file(fileId)
         fixedTitle = removePathsFromFilenames(attachment['filename'])
         fileObj.manage_changeProperties(
             content_type=attachment['mimetype'], title=fixedTitle,
