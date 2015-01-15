@@ -17,4 +17,5 @@ from zope.interface import Interface
 
 
 class IStorageForEmailMessage(Interface):
-    pass
+    def store():  # lint:ok
+        'Store the message'

@@ -89,7 +89,6 @@ Two files will have the same ID if
                     pl = split_multipart(b, pl)
             else:
                 pl.append(msg)
-
             return pl
 
         retval = []
@@ -171,10 +170,12 @@ Two files will have the same ID if
         assert retval
         return retval
 
-    def manage_addMail(self, msg):
+    def store(self):
         """ Store mail & attachments in a folder and return it."""
-        ids = []
-        for attachment in msg.attachments:
+        self.emailQuery.insert()
+
+        fileIds = []
+        for attachment in self.attachments:
             if ((attachment['filename'] == '')
                     and (attachment['subtype'] == 'plain')):
                 # We definately don't want to save the plain text body
@@ -186,9 +187,9 @@ Two files will have the same ID if
                 # but we archive the HTML body here, as it suggests in the
                 # log message. The HTML body is archived along with the
                 # plain text body.
-                m = '%s (%s): archiving HTML message.' % \
-                    (self.listTitle, self.group_id)
-                log.info(m)
+                m = '{0} ({1}): archiving HTML message.'
+                logMsg = m.format(self.listTitle, self.group_id)
+                log.info(logMsg)
             elif attachment['contentid'] and (attachment['filename'] == ''):
                 # TODO: What do we want to do with these? They are typically
                 # part of an HTML message, for example the images, but what
@@ -206,34 +207,31 @@ Two files will have the same ID if
                      attachment['maintype'], attachment['filename'])
                 log.warn(m)
             else:
-                m = '%s (%s): stripped and archiving %s attachment %s' %\
-                    (self.listTitle, self.group_id,
-                     attachment['maintype'], attachment['filename'])
-                log.info(m)
+                m = '{0} ({1}): stripped and archiving {2} attachment {3}'
+                logMsg = m.format(self.listTitle, self.group_id,
+                                  attachment['maintype'],
+                                  attachment['filename'])
+                log.info(logMsg)
 
-                nid = self.addGSFile(attachment['filename'], msg.subject,
-                                     msg.sender_id, attachment['payload'],
-                                     attachment['mimetype'])
-                ids.append(nid)
+                nid = self.add_file(attachment, self.subject,
+                                    self.sender_id)
+                fileIds.append(nid)
+        # --=mpj17=-- The file meatadata can only be added once the
+        # email is stored.
+        self.fileQuery.insert(self, fileIds)
 
-        self.emailQuery.insert()
-        self.fileQuery.insert(self, ids)
+        return (self.post_id, fileIds)
 
-        return (msg.post_id, ids)
-
-    def addGSFile(self, title, topic, creator, data, content_type):
-        """ Adds an attachment as a file.
-
-        """
-        # TODO: group ID should be more robust
-        group_id = self.getId()
-        storage = self.FileLibrary2.get_fileStorage()
-        fileId = storage.add_file(data)
+    def add_file(self, attachment, topic, creator):
+        """ Adds an attachment as a file."""
+        # Warning: Aquisition
+        storage = self.context.FileLibrary2.get_fileStorage()
+        fileId = storage.add_file(attachment['payload'])
         fileObj = storage.get_file(fileId)
-        fixedTitle = removePathsFromFilenames(title)
+        fixedTitle = removePathsFromFilenames(attachment['filename'])
         fileObj.manage_changeProperties(
-            content_type=content_type, title=fixedTitle,
-            tags=['attachment'], group_ids=[group_id],
+            content_type=attachment['mimetype'], title=fixedTitle,
+            tags=['attachment'], group_ids=[self.group_id],
             dc_creator=creator, topic=topic)
         fileObj.reindex_file()
         #
