@@ -54,7 +54,7 @@ setup(
     zip_safe=False,
     install_requires=[
         'setuptools', ],
-    #test_suite="gs.group.list.check.tests.test_all",
+    test_suite="gs.group.list.store.tests.test_all",
     tests_require=['mock', ],
     entry_points="""
     # -*- Entry points: -*-
