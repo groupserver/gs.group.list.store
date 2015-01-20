@@ -163,7 +163,7 @@ just used in the HTML body'''
 
         with patch.object(self.messageStore, 'add_file') as addFileMock:
             self.messageStore.store_attachment(a)
-        self.assertEqual(1, addFileMock.call_count)
+        addFileMock.assert_called_once_with(a, 'Violence', '')
 
     @patch('gs.group.list.store.messagestore.log')
     def test_store_attachment_empty(self, l):
@@ -186,4 +186,4 @@ used in the HTML body'''
 
         with patch.object(self.messageStore, 'add_file') as addFileMock:
             self.messageStore.store_attachment(a)
-        self.assertEqual(1, addFileMock.call_count)
+        addFileMock.assert_called_once_with(a, 'Violence', '')
