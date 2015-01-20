@@ -79,6 +79,9 @@ class EmailMessageStore(EmailMessage):
 
     def store(self):
         """ Store mail & attachments in a folder and return it."""
+        logMsg = 'Storing post "{0}"'.format(self.post_id)
+        log.info(logMsg)
+
         self.emailQuery.insert()
         fileIds = []
         for attachment in self.attachments:
