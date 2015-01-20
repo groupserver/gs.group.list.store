@@ -53,7 +53,14 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=[
-        'setuptools', ],
+        'setuptools',
+        'SQLAlchemy',
+        'zope.cachedescriptors',
+        'zope.datetime',
+        'zope.interface',
+        'zope.sqlalchemy',
+        'gs.database',
+        'gs.group.list.base', ],
     test_suite="gs.group.list.store.tests.test_all",
     tests_require=['mock', ],
     entry_points="""
