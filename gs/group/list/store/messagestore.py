@@ -49,7 +49,7 @@ class EmailMessageStore(EmailMessage):
 
     @Lazy
     def fileQuery(self):
-        retval = FileMetadataStorageQuery(self.context)
+        retval = FileMetadataStorageQuery()
         return retval
 
     @Lazy
@@ -83,14 +83,15 @@ class EmailMessageStore(EmailMessage):
         log.info(logMsg)
 
         self.emailQuery.insert()
-        fileIds = []
-        for attachment in self.attachments:
-                nid = self.store_attachment(attachment)
-                if nid is not None:
-                    fileIds.append(nid)
         # --=mpj17=-- The file meatadata can only be added once the
         # email is stored.
-        self.fileQuery.insert(self, fileIds)
+        fileMetadata = []
+        for attachment in self.attachments:
+                d = self.store_attachment(attachment)
+                if d is not None:
+                    fileMetadata.append(d)
+        self.fileQuery.insert_metadata(fileMetadata)
+        fileIds = [f['file_id'] for f in fileMetadata]
         return (self.post_id, fileIds)
 
     def store_attachment(self, attachment):
@@ -132,7 +133,15 @@ class EmailMessageStore(EmailMessage):
                               attachment['filename'])
             log.info(logMsg)
 
-            retval = self.add_file(attachment, self.subject, self.sender_id)
+            fileId = self.add_file(attachment, self.subject, self.sender_id)
+            filename = removePathsFromFilenames(attachment['filename'])
+            retval = {'file_id': fileId,
+                      'mime_type': attachment['mimetype'],
+                      'file_name': filename,
+                      'file_size': attachment['length'],
+                      'date': self.date,
+                      'post_id': self.post_id,
+                      'topic_id': self.topic_id}
         return retval
 
     @Lazy

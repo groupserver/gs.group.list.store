@@ -31,34 +31,18 @@ class DuplicateMessageError(Exception):
 
 
 class FileMetadataStorageQuery(object):
-    def __init__(self, context):
-        self.context = context
+    def __init__(self):
         self.fileTable = getTable('file')
         self.postTable = getTable('post')
 
-    def insert(self, email_message, file_ids):
-        # FIXME: references like this should *NOT* be hardcoded!
-        storage = self.context.FileLibrary2.get_fileStorage()
+    def insert_metadata(self, metadata):
         session = getSession()
-        for fid in file_ids:
-            # for each file, get the metadata and insert it into our RDB
-            # table
-            attachedFile = storage.get_file(fid)
+        if metadata:
             i = self.fileTable.insert()
-            d = {
-                'file_id': fid,
-                'mime_type': attachedFile.getProperty('content_type', ''),
-                'file_name': attachedFile.getProperty('title', ''),
-                'file_size': getattr(attachedFile, 'size', 0),
-                'date': email_message.date,
-                'post_id': email_message.post_id,
-                'topic_id': email_message.topic_id, }
-            session.execute(i, params=d)
+            session.execute(i, params=metadata)
 
-        # set the flag on the post table to avoid lookups
-        if file_ids:
-            u = self.postTable.update(
-                self.postTable.c.post_id == email_message.post_id)
+            postId = metadata[0]['post_id']
+            u = self.postTable.update(self.postTable.c.post_id == postId)
             session.execute(u, params={'has_attachments': True})
             mark_changed(session)
 
