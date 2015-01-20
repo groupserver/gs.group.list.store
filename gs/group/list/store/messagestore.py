@@ -14,18 +14,11 @@
 ############################################################################
 from __future__ import absolute_import, unicode_literals
 from datetime import datetime
-try:  # Python 2
-    from hashlib import md5
-    INT = long
-except:  # Python 3
-    from md5 import md5  # lint:ok
-    INT = int
 from logging import getLogger
 log = getLogger('gs.group.list.store.messagestore')
 import re
 from zope.cachedescriptors.property import Lazy
 from zope.datetime import parseDatetimetz
-from gs.core import to_unicode_or_bust, convert_int2b62
 from gs.group.list.base import EmailMessage
 from Products.XWFCore.XWFUtils import removePathsFromFilenames
 from .queries import (EmailMessageStorageQuery, FileMetadataStorageQuery)
@@ -35,16 +28,16 @@ class EmailMessageStore(EmailMessage):
 
     def __init__(self, context, message, list_title='', group_id='',
                  site_id='', sender_id_cb=None, replace_mail_date=True):
-        super(EmailMessageStore, self).__init__(
-            message, list_title, group_id, site_id, sender_id_cb)
+        super(EmailMessageStore, self).__init__('', list_title, group_id,
+                                                site_id, sender_id_cb)
         self.context = context
-        self._list_title = list_title
+        self.message = message
         self.replace_mail_date = replace_mail_date
 
     @classmethod
     def from_email_message(cls, context, emailMessage,
                            replaceMailDate=True):
-        retval = cls(emailMessage.message, emailMessage.list_title,
+        retval = cls(context, emailMessage.message, emailMessage.list_title,
                      emailMessage.group_id, emailMessage.site_id,
                      emailMessage.sender_id_cb, replaceMailDate)
         return retval
@@ -56,7 +49,7 @@ class EmailMessageStore(EmailMessage):
 
     @Lazy
     def fileQuery(self):
-        retval = FileMetadataStorageQuery(self)
+        retval = FileMetadataStorageQuery(self.context)
         return retval
 
     @Lazy
@@ -87,54 +80,57 @@ class EmailMessageStore(EmailMessage):
     def store(self):
         """ Store mail & attachments in a folder and return it."""
         self.emailQuery.insert()
-
         fileIds = []
         for attachment in self.attachments:
-            if ((attachment['filename'] == '')
-                    and (attachment['subtype'] == 'plain')):
-                # We definately don't want to save the plain text body
-                # again!
-                pass
-            elif ((attachment['filename'] == '')
-                    and (attachment['subtype'] == 'html')):
-                # We might want to do something with the HTML body some day,
-                # but we archive the HTML body here, as it suggests in the
-                # log message. The HTML body is archived along with the
-                # plain text body.
-                m = '{0} ({1}): archiving HTML message.'
-                logMsg = m.format(self.listTitle, self.group_id)
-                log.info(logMsg)
-            elif attachment['contentid'] and (attachment['filename'] == ''):
-                # TODO: What do we want to do with these? They are typically
-                # part of an HTML message, for example the images, but what
-                # should we do with them once we've stripped them?
-                m = '%s (%s): stripped, but not archiving %s attachment '\
-                    '%s; it appears to be part of an HTML message.' % \
-                    (self.listTitle, self.group_id,
-                     attachment['maintype'], attachment['filename'])
-                log.info(m)
-            elif attachment['length'] <= 0:
-                # Empty attachment. Kinda pointless archiving this!
-                m = '%s (%s): stripped, but not archiving %s attachment '\
-                    '%s; attachment was of zero size.' % \
-                    (self.listTitle, self.group_id,
-                     attachment['maintype'], attachment['filename'])
-                log.warn(m)
-            else:
-                m = '{0} ({1}): stripped and archiving {2} attachment {3}'
-                logMsg = m.format(self.listTitle, self.group_id,
-                                  attachment['maintype'],
-                                  attachment['filename'])
-                log.info(logMsg)
-
-                nid = self.add_file(attachment, self.subject,
-                                    self.sender_id)
-                fileIds.append(nid)
+                nid = self.store_attachment(attachment)
+                if nid is not None:
+                    fileIds.append(nid)
         # --=mpj17=-- The file meatadata can only be added once the
         # email is stored.
         self.fileQuery.insert(self, fileIds)
-
         return (self.post_id, fileIds)
+
+    def store_attachment(self, attachment):
+        retval = None
+        if ((attachment['filename'] == '')
+                and (attachment['subtype'] == 'plain')):
+            # We definately don't want to save the plain text body
+            # again!
+            pass
+        elif ((attachment['filename'] == '')
+                and (attachment['subtype'] == 'html')):
+            # We might want to do something with the HTML body some day,
+            # but we archive the HTML body here, as it suggests in the
+            # log message. The HTML body is archived along with the
+            # plain text body.
+            m = '{0} ({1}): archiving HTML message.'
+            logMsg = m.format(self.list_title, self.group_id)
+            log.info(logMsg)
+        elif attachment['contentid'] and (attachment['filename'] == ''):
+            # TODO: What do we want to do with these? They are typically
+            # part of an HTML message, for example the images, but what
+            # should we do with them once we've stripped them?
+            m = '%s (%s): stripped, but not archiving %s attachment '\
+                '%s; it appears to be part of an HTML message.' % \
+                (self.list_title, self.group_id,
+                 attachment['maintype'], attachment['filename'])
+            log.info(m)
+        elif attachment['length'] <= 0:
+            # Empty attachment. Kinda pointless archiving this!
+            m = '%s (%s): stripped, but not archiving %s attachment '\
+                '%s; attachment was of zero size.' % \
+                (self.list_title, self.group_id,
+                 attachment['maintype'], attachment['filename'])
+            log.warn(m)
+        else:
+            m = '{0} ({1}): stripped and archiving {2} attachment {3}'
+            logMsg = m.format(self.list_title, self.group_id,
+                              attachment['maintype'],
+                              attachment['filename'])
+            log.info(logMsg)
+
+            retval = self.add_file(attachment, self.subject, self.sender_id)
+        return retval
 
     @Lazy
     def storage(self):

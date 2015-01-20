@@ -40,7 +40,7 @@ class FileMetadataStorageQuery(object):
         # FIXME: references like this should *NOT* be hardcoded!
         storage = self.context.FileLibrary2.get_fileStorage()
         session = getSession()
-        for fid in self.file_ids:
+        for fid in file_ids:
             # for each file, get the metadata and insert it into our RDB
             # table
             attachedFile = storage.get_file(fid)
@@ -50,15 +50,15 @@ class FileMetadataStorageQuery(object):
                 'mime_type': attachedFile.getProperty('content_type', ''),
                 'file_name': attachedFile.getProperty('title', ''),
                 'file_size': getattr(attachedFile, 'size', 0),
-                'date': self.email_message.date,
-                'post_id': self.email_message.post_id,
-                'topic_id': self.email_message.topic_id, }
+                'date': email_message.date,
+                'post_id': email_message.post_id,
+                'topic_id': email_message.topic_id, }
             session.execute(i, params=d)
 
         # set the flag on the post table to avoid lookups
-        if self.file_ids:
+        if file_ids:
             u = self.postTable.update(
-                self.postTable.c.post_id == self.email_message.post_id)
+                self.postTable.c.post_id == email_message.post_id)
             session.execute(u, params={'has_attachments': True})
             mark_changed(session)
 
