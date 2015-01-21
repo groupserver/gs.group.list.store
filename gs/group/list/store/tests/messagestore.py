@@ -13,9 +13,12 @@
 #
 ############################################################################
 from __future__ import absolute_import, unicode_literals
+import codecs
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.parser import Parser
 from mock import (MagicMock, patch)
+import os
 from unittest import TestCase
 from gs.group.list.base.emailmessage import EmailMessage
 import gs.group.list.store.messagestore  # lint:ok
@@ -187,3 +190,37 @@ used in the HTML body'''
         with patch.object(self.messageStore, 'add_file') as addFileMock:
             self.messageStore.store_attachment(a)
         addFileMock.assert_called_once_with(a, 'Violence', '')
+
+    @patch('gs.group.list.store.messagestore.log')
+    @patch('gs.group.list.store.messagestore.FileMetadataStorageQuery')
+    @patch('gs.group.list.store.messagestore.EmailMessageStorageQuery')
+    def test_full_message(self, EmailMessageStorageQuery,
+                          FileMetadataStorageQuery, l):
+        'Test the EmailMessageStore.store method with a full email'
+        filename = os.path.join('gs', 'group', 'list', 'store', 'tests',
+                                'Testing_all_the_things.mbox')
+        with codecs.open(filename, encoding='utf-8') as infile:
+            parser = Parser()
+            m = parser.parse(infile)
+        context = MagicMock()
+        messageStore = EmailMessageStore(
+            context, m, list_title='Ethel the Frog', group_id='ethel')
+
+        self.assertEqual(3, messageStore.attachment_count)
+        setFileIds = ['a', 'b', 'c']
+        with patch.object(messageStore, 'add_file') as addFileMock:
+            addFileMock.side_effect = setFileIds
+            post_id, fileIds = messageStore.store()
+
+        self.assertEqual(messageStore.post_id, post_id)
+        self.assertEqual(3, addFileMock.call_count)
+        EmailMessageStorageQuery().insert.called_once_with()
+        self.assertEqual(3, len(fileIds))
+        self.assertEqual(['a', 'b', 'c'], fileIds)
+        a, kwargs = FileMetadataStorageQuery().insert_metadata.call_args
+        args = a[0]
+        self.assertEqual(3, len(args))
+        filenames = [d['file_name'] for d in args]
+        self.assertIn('gs-logo.svg', filenames)
+        self.assertIn('mobile-email-file-link-test.jpg', filenames)
+        self.assertIn('gs-14.11-announcement.txt', filenames)
