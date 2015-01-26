@@ -1,7 +1,7 @@
 Changelog
 =========
 
-1.0.0 (2014-01-xx)
+1.0.0 (2015-01-26)
 ------------------
 
 * Initial release, inspired by code from the
