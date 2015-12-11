@@ -19,6 +19,7 @@ from email.mime.text import MIMEText
 from email.parser import Parser
 from mock import (MagicMock, patch)
 import os
+from pkg_resources import resource_filename
 from unittest import TestCase
 from gs.group.list.base.emailmessage import EmailMessage
 import gs.group.list.store.messagestore  # lint:ok
@@ -197,8 +198,8 @@ used in the HTML body'''
     def test_full_message(self, EmailMessageStorageQuery,
                           FileMetadataStorageQuery, l):
         'Test the EmailMessageStore.store method with a full email'
-        filename = os.path.join('gs', 'group', 'list', 'store', 'tests',
-                                'Testing_all_the_things.mbox')
+        testFile = os.path.join('tests', 'Testing_all_the_things.mbox')
+        filename = resource_filename('gs.group.list.store', testFile)
         with codecs.open(filename, encoding='utf-8') as infile:
             parser = Parser()
             m = parser.parse(infile)
